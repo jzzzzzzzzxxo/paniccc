@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panic Predictor V2</title>
+<style>
+body{margin:0;font-family:Inter,Arial,sans-serif;background:#f5f7fb;color:#222}
+.sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:#111827;color:white;padding:20px}
+.main{margin-left:240px;padding:25px}
+.card{background:white;border-radius:16px;padding:20px;margin-bottom:20px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+input,select,button{padding:10px;border-radius:10px;border:1px solid #ddd}
+input,select{width:100%;margin:6px 0}
+button{background:#4f46e5;color:white;border:none;cursor:pointer}
+.progress{height:22px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.bar{height:100%;width:0%;background:#22c55e;transition:.4s}
+.task{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#f8fafc;margin:8px 0;border-radius:10px}
+.hidden{display:none}
+.auth{max-width:420px;margin:50px auto}
+.warn{display:none;color:#dc2626;font-weight:bold}
+.small{color:#666;font-size:14px}
+</style>
+</head>
+<body>
+
+<div id="auth" class="auth">
+<div class="card">
+<h2>Panic Predictor V2</h2>
+<input id="name" placeholder="Name (signup only)">
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<label><input type="checkbox" id="remember"> Remember Me</label><br><br>
+<button onclick="signup()">Sign Up</button>
+<button onclick="login()">Login</button>
+</div>
+</div>
+
+<div id="app" class="hidden">
+<div class="sidebar">
+<h2>🧠 Panic Predictor</h2>
+<p id="welcome"></p>
+<button onclick="logout()">Logout</button>
+</div>
+
+<div class="main">
+<div class="card">
+<h3>Panic Level</h3>
+<div class="progress"><div id="bar" class="bar"></div></div>
+<p id="level">Low Risk</p>
+<p id="warning" class="warn">🚨 High workload predicted this week.</p>
+</div>
+
+<div class="card">
+<h3>Add Task</h3>
+<input id="title" placeholder="Task Name">
+<select id="type">
+<option>Assignment</option>
+<option>Quiz</option>
+<option>Exam</option>
+</select>
+<input id="hours" type="number" placeholder="Study Hours">
+<input id="dueDate" type="date">
+<button onclick="addTask()">Add Task</button>
+</div>
+
+<div class="card">
+<h3>Your Tasks</h3>
+<div id="taskList"></div>
+</div>
+</div>
+</div>
+
+<script>
+function getUser(){
+ return JSON.parse(localStorage.getItem("currentUser"));
+}
+
+function getTasks(){
+ const u=getUser();
+ return JSON.parse(localStorage.getItem("tasks_"+u.email)||"[]");
+}
+
+function saveTasks(tasks){
+ const u=getUser();
+ localStorage.setItem("tasks_"+u.email,JSON.stringify(tasks));
+}
+
+function signup(){
+ let users=JSON.parse(localStorage.getItem("users")||"[]");
+ if(users.find(u=>u.email===email.value)){
+   alert("Email already exists");
+   return;
+ }
+ users.push({name:name.value,email:email.value,password:password.value});
+ localStorage.setItem("users",JSON.stringify(users));
+ alert("Account created");
+}
+
+function login(){
+ let users=JSON.parse(localStorage.getItem("users")||"[]");
+ let user=users.find(u=>u.email===email.value && u.password===password.value);
+ if(!user){alert("Invalid login");return;}
+ if(remember.checked){
+   localStorage.setItem("currentUser",JSON.stringify(user));
+ }else{
+   sessionStorage.setItem("currentUser",JSON.stringify(user));
+ }
+ openApp(user);
+}
+
+function openApp(user){
+ if(!user){
+  user=JSON.parse(localStorage.getItem("currentUser"))||JSON.parse(sessionStorage.getItem("currentUser"));
+ }
+ if(!user) return;
+
+ if(!localStorage.getItem("currentUser"))
+   localStorage.setItem("currentUser",JSON.stringify(user));
+
+ auth.classList.add("hidden");
+ app.classList.remove("hidden");
+ welcome.textContent="Welcome, "+user.name;
+ render();
+}
+
+function logout(){
+ localStorage.removeItem("currentUser");
+ sessionStorage.removeItem("currentUser");
+ location.reload();
+}
+
+function addTask(){
+ let tasks=getTasks();
+ tasks.push({
+  title:title.value,
+  type:type.value,
+  hours:Number(hours.value),
+  dueDate:dueDate.value
+ });
+ saveTasks(tasks);
+ render();
+}
+
+function editTask(i){
+ let tasks=getTasks();
+ let nt=prompt("Edit task",tasks[i].title);
+ if(nt){
+   tasks[i].title=nt;
+   saveTasks(tasks);
+   render();
+ }
+}
+
+function deleteTask(i){
+ let tasks=getTasks();
+ if(confirm("Delete task?")){
+   tasks.splice(i,1);
+   saveTasks(tasks);
+   render();
+ }
+}
+
+function render(){
+ let tasks=getTasks();
+ taskList.innerHTML="";
+
+ tasks.forEach((t,i)=>{
+   let due=new Date(t.dueDate);
+   let now=new Date();
+   let days=Math.ceil((due-now)/86400000);
+
+   let status="";
+   if(days<0) status="<span style='color:red'>Overdue</span>";
+   else if(days<=2) status="<span style='color:orange'>Due Soon</span>";
+
+   taskList.innerHTML += `
+   <div class="task">
+     <div>
+      <b>${t.title}</b><br>
+      <span class="small">${t.type} • ${t.hours} hrs • ${t.dueDate}</span><br>
+      ${status}
+     </div>
+     <div>
+      <button onclick="editTask(${i})">Edit</button>
+      <button onclick="deleteTask(${i})">Delete</button>
+     </div>
+   </div>`;
+ });
+
+ calc();
+}
+
+function calc(){
+ let score=0;
+ let tasks=getTasks();
+
+ tasks.forEach(t=>{
+  let d=Math.ceil((new Date(t.dueDate)-new Date())/86400000);
+  let w=t.hours||0;
+
+  if(t.type==="Quiz") w*=1.3;
+  if(t.type==="Exam") w*=2;
+
+  if(d<=7) score+=w;
+ });
+
+ score=Math.min(score,100);
+
+ bar.style.width=score+"%";
+
+ if(score<30){
+   bar.style.background="#22c55e";
+   level.textContent="Low Risk";
+   warning.style.display="none";
+ }
+ else if(score<70){
+   bar.style.background="#f59e0b";
+   level.textContent="Medium Risk";
+   warning.style.display="none";
+ }
+ else{
+   bar.style.background="#ef4444";
+   level.textContent="High Risk";
+   warning.style.display="block";
+ }
+}
+
+window.onload=()=>{
+ let u=JSON.parse(localStorage.getItem("currentUser"))||JSON.parse(sessionStorage.getItem("currentUser"));
+ if(u) openApp(u);
+}
+</script>
+</body>
+</html>
