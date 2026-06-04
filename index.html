@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panic Predictor V2</title>
+<title>Panic Predictor</title>
 <style>
 body{margin:0;font-family:Inter,Arial,sans-serif;background:#f5f7fb;color:#222}
 .sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:#111827;color:white;padding:20px}
@@ -25,7 +25,7 @@ button{background:#4f46e5;color:white;border:none;cursor:pointer}
 
 <div id="auth" class="auth">
 <div class="card">
-<h2>Panic Predictor V2</h2>
+<h2>Panic Predictor</h2>
 <input id="name" placeholder="Name (signup only)">
 <input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
@@ -38,7 +38,14 @@ button{background:#4f46e5;color:white;border:none;cursor:pointer}
 <div id="app" class="hidden">
 <div class="sidebar">
 <h2>🧠 Panic Predictor</h2>
-<p id="welcome"></p>
+<div id="welcome"
+style="
+margin-top:15px;
+padding:10px;
+background:#1f2937;
+border-radius:10px;
+">
+</div>
 <button onclick="logout()">Logout</button>
 </div>
 
@@ -86,6 +93,12 @@ function saveTasks(tasks){
 }
 
 function signup(){
+
+ if(!name.value.trim()){
+  alert("Please enter your name");
+  return;
+ }
+
  let users=JSON.parse(localStorage.getItem("users")||"[]");
  if(users.find(u=>u.email===email.value)){
    alert("Email already exists");
@@ -102,10 +115,15 @@ function login(){
  if(!user){alert("Invalid login");return;}
  if(remember.checked){
    localStorage.setItem("currentUser",JSON.stringify(user));
- }else{
+}else{
    sessionStorage.setItem("currentUser",JSON.stringify(user));
- }
- openApp(user);
+}
+
+name.value="";
+email.value="";
+password.value="";
+
+openApp(user);
 }
 
 function openApp(user){
@@ -119,7 +137,8 @@ function openApp(user){
 
  auth.classList.add("hidden");
  app.classList.remove("hidden");
- welcome.textContent="Welcome, "+user.name;
+ welcome.innerHTML =
+"👋 Welcome, <strong>"+user.name+"</strong>";
  render();
 }
 
